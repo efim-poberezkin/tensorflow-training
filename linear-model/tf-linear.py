@@ -14,19 +14,23 @@
 # ---
 
 # %%
+from statistics import mean
+
 import pandas as pd
 
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score
+from sklearn.metrics import f1_score
+from sklearn.model_selection import KFold
 from sklearn.multiclass import OneVsRestClassifier
 
 # %%
-df = pd.read_csv("../auxiliary/multilabel_dataset.csv")
+df = pd.read_csv("data/multilabel_dataset.csv")
 df.describe(include="all")
 
 # %%
-features = df.iloc[:, :-14]
-targets = df.iloc[:, -14:]
+X = df.iloc[:, :-14]
+y = df.iloc[:, -14:]
+cv = KFold(n_splits=5, random_state=37)
 
 # %% [markdown]
 # # scikit-learn baseline
@@ -34,5 +38,12 @@ targets = df.iloc[:, -14:]
 # %%
 lr = LogisticRegression(solver="lbfgs")
 clf = OneVsRestClassifier(lr)
-scores = cross_val_score(clf, features, targets, scoring="f1_micro", cv=5)
-print(scores.mean())
+scores = []
+for train_index, test_index in cv.split(X):
+    X_train, X_test = X.iloc[train_index], X.iloc[test_index]
+    y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+    clf.fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+    score = f1_score(y_test, y_pred, average="micro")
+    scores.append(score)
+print(mean(scores))

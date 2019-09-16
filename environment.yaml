@@ -4,10 +4,14 @@ channels:
   - defaults
 dependencies:
   - _libgcc_mutex=0.1=main
+  - appdirs=1.4.3=py37h28b3542_0
+  - attrs=19.1.0=py37_1
   - backcall=0.1.0=py37_0
+  - black=19.3b0=py_0
   - blas=1.0=mkl
   - ca-certificates=2019.5.15=1
   - certifi=2019.6.16=py37_1
+  - click=7.0=py37_0
   - decorator=4.4.0=py37_1
   - intel-openmp=2019.4=243
   - ipykernel=5.1.2=py37h39e3cac_0
@@ -50,6 +54,7 @@ dependencies:
   - six=1.12.0=py37_0
   - sqlite=3.29.0=h7b6447c_0
   - tk=8.6.8=hbc83047_0
+  - toml=0.10.0=py37h28b3542_0
   - tornado=6.0.3=py37h7b6447c_0
   - traitlets=4.3.2=py37_0
   - wcwidth=0.1.7=py37_0
