@@ -18,7 +18,6 @@ from statistics import mean
 
 import numpy as np
 import pandas as pd
-
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score
 from sklearn.model_selection import KFold
@@ -27,14 +26,19 @@ from sklearn.multiclass import OneVsRestClassifier
 import tensorflow as tf
 
 tf.logging.set_verbosity(tf.logging.ERROR)
+tf.random.set_random_seed(47)
+
+from keras import optimizers
+from keras.models import Sequential
+from keras.layers import Dense
 
 # %%
 df = pd.read_csv("data/multilabel_dataset.csv")
 df.describe(include="all")
 
 # %%
-features = df.iloc[:, :-14]
-labels = df.iloc[:, -14:]
+X = df.iloc[:, :-14].values
+Y = df.iloc[:, -14:].values
 cv = KFold(n_splits=5, random_state=37)
 
 # %% [markdown]
@@ -43,34 +47,34 @@ cv = KFold(n_splits=5, random_state=37)
 # %%
 lr = LogisticRegression(solver="lbfgs")
 clf = OneVsRestClassifier(lr)
+
+# %%
 scores = []
-for train_index, test_index in cv.split(features):
-    X_train, X_test = features.iloc[train_index], features.iloc[test_index]
-    y_train, y_test = labels.iloc[train_index], labels.iloc[test_index]
-    clf.fit(X_train, y_train)
-    y_pred = clf.predict(X_test)
-    score = f1_score(y_test, y_pred, average="micro")
+
+for train, test in cv.split(X, Y):
+    clf.fit(X[train], Y[train])
+    Y_pred = clf.predict(X[test])
+    score = f1_score(Y[test], Y_pred, average="micro")
     scores.append(score)
+
 print(mean(scores))
 
 # %% [markdown]
 # # pure tensorflow
 
 # %%
-tf.random.set_random_seed(47)
-
 # Model parameters
 learning_rate = 0.03
-n_epochs = 100
+num_epochs = 100
 
 # Dimensions
-num_features = len(features.columns)
-num_labels = len(labels.columns)
+num_features = len(X[0])
+num_labels = len(Y[0])
 
 # %%
 # Create placeholders for features and labels
-X = tf.placeholder(tf.float32, name="features")
-Y = tf.placeholder(tf.float32, name="labels")
+X_tensor = tf.placeholder(tf.float32, name="features")
+Y_tensor = tf.placeholder(tf.float32, name="labels")
 
 # Create variables for weights and bias
 w = tf.get_variable(
@@ -83,7 +87,7 @@ b = tf.get_variable(
 )
 
 # Build a model returning logits
-logits = tf.matmul(X, w) + b
+logits = tf.matmul(X_tensor, w) + b
 
 # Define loss function. Unlike the single-label case, we should not output
 # a softmax probability distribultion as labels are classified independently.
@@ -92,7 +96,7 @@ logits = tf.matmul(X, w) + b
 # so that the whole model's performance is the sum of its per-class performances
 loss = tf.reduce_mean(
     tf.reduce_sum(
-        tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=Y), axis=1
+        tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=Y_tensor), axis=1
     )
 )
 
@@ -109,22 +113,46 @@ prediction = tf.sigmoid(logits)
 one_hot_prediction = multi_label_hot(prediction)
 
 # %%
-for train_index, test_index in cv.split(features):
-    X_train, X_test = features.iloc[train_index], features.iloc[test_index]
-    y_train, y_test = labels.iloc[train_index], labels.iloc[test_index]
+scores = []
 
+for train, test in cv.split(X, Y):
     with tf.Session() as sess:
         # Initialize variables
         sess.run(tf.global_variables_initializer())
 
         # Train model
-        for epoch in range(n_epochs):
-            _, l = sess.run([optimizer, loss], feed_dict={X: X_train, Y: y_train})
+        for epoch in range(num_epochs):
+            _, l = sess.run(
+                [optimizer, loss], feed_dict={X_tensor: X[train], Y_tensor: Y[train]}
+            )
 
         # Calculate predicted values
-        y_pred = sess.run(one_hot_prediction, {X: X_test, Y: y_test})
+        Y_pred = sess.run(one_hot_prediction, {X_tensor: X[test], Y_tensor: Y[test]})
 
-    score = f1_score(y_test, y_pred, average="micro")
+    score = f1_score(Y[test], Y_pred, average="micro")
     scores.append(score)
-    
+
+print(mean(scores))
+
+# %% [markdown]
+# # keras
+
+# %%
+scores = []
+
+for train, test in cv.split(X, Y):
+    # Create and compile model
+    model = Sequential()
+    model.add(Dense(num_labels, activation="sigmoid"))
+
+    adam = optimizers.Adam(lr=learning_rate)
+    model.compile(optimizer=adam, loss="binary_crossentropy", metrics=["accuracy"])
+
+    # Fit and make prediction
+    model.fit(X[train], Y[train], epochs=num_epochs, batch_size=200, verbose=0)
+    Y_pred = (model.predict(X[test]) > 0.5).astype(np.uint8)
+
+    score = f1_score(Y[test], Y_pred, average="micro")
+    scores.append(score)
+
 print(mean(scores))
