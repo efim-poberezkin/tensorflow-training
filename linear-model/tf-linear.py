@@ -143,10 +143,34 @@ scores = []
 for train, test in cv.split(X, Y):
     # Create and compile model
     model = Sequential()
-    model.add(Dense(num_labels, activation="sigmoid"))
+    model.add(Dense(num_labels, activation="sigmoid", input_shape=(num_features,)))
 
     adam = optimizers.Adam(lr=learning_rate)
     model.compile(optimizer=adam, loss="binary_crossentropy", metrics=["accuracy"])
+
+    # Fit and make prediction
+    model.fit(X[train], Y[train], epochs=num_epochs, batch_size=200, verbose=0)
+    Y_pred = (model.predict(X[test]) > 0.5).astype(np.uint8)
+
+    score = f1_score(Y[test], Y_pred, average="micro")
+    scores.append(score)
+
+print(mean(scores))
+
+# %% [markdown]
+# # keras with nonlinearity
+
+# %%
+scores = []
+
+for train, test in cv.split(X, Y):
+    # Create and compile model
+    model = Sequential()
+    model.add(Dense(56, activation="relu", input_shape=(num_features,)))
+    model.add(Dense(28, activation="relu"))
+    model.add(Dense(num_labels, activation="sigmoid"))
+
+    model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
 
     # Fit and make prediction
     model.fit(X[train], Y[train], epochs=num_epochs, batch_size=200, verbose=0)
