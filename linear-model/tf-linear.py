@@ -29,8 +29,9 @@ tf.logging.set_verbosity(tf.logging.ERROR)
 tf.random.set_random_seed(47)
 
 from keras import optimizers
+from keras.callbacks import EarlyStopping
 from keras.models import Sequential
-from keras.layers import Dense
+from keras.layers import Dense, Dropout
 
 # %%
 df = pd.read_csv("data/multilabel_dataset.csv")
@@ -57,7 +58,7 @@ for train, test in cv.split(X, Y):
     score = f1_score(Y[test], Y_pred, average="micro")
     scores.append(score)
 
-print(mean(scores))
+print(f"Micro-averaged f1 on cross validation: {mean(scores)}")
 
 # %% [markdown]
 # # pure tensorflow
@@ -132,7 +133,7 @@ for train, test in cv.split(X, Y):
     score = f1_score(Y[test], Y_pred, average="micro")
     scores.append(score)
 
-print(mean(scores))
+print(f"Micro-averaged f1 on cross validation: {mean(scores)}")
 
 # %% [markdown]
 # # keras
@@ -155,7 +156,7 @@ for train, test in cv.split(X, Y):
     score = f1_score(Y[test], Y_pred, average="micro")
     scores.append(score)
 
-print(mean(scores))
+print(f"Micro-averaged f1 on cross validation: {mean(scores)}")
 
 # %% [markdown]
 # # keras with nonlinearity
@@ -166,17 +167,30 @@ scores = []
 for train, test in cv.split(X, Y):
     # Create and compile model
     model = Sequential()
-    model.add(Dense(56, activation="relu", input_shape=(num_features,)))
-    model.add(Dense(28, activation="relu"))
+    model.add(Dense(200, activation="relu", input_shape=(num_features,)))
+    model.add(Dropout(0.3))
+    model.add(Dense(200, activation="relu"))
+    model.add(Dropout(0.3))
+    model.add(Dense(200, activation="relu"))
+    model.add(Dropout(0.3))
     model.add(Dense(num_labels, activation="sigmoid"))
 
     model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
 
     # Fit and make prediction
-    model.fit(X[train], Y[train], epochs=num_epochs, batch_size=200, verbose=0)
+    es = EarlyStopping(monitor="val_loss", mode="min", patience=5, verbose=1)
+    model.fit(
+        X[train],
+        Y[train],
+        epochs=num_epochs,
+        batch_size=200,
+        verbose=1,
+        validation_split=0.3,
+        callbacks=[es]
+    )
     Y_pred = (model.predict(X[test]) > 0.5).astype(np.uint8)
 
     score = f1_score(Y[test], Y_pred, average="micro")
     scores.append(score)
 
-print(mean(scores))
+print(f"Micro-averaged f1 on cross validation: {mean(scores)}")
