@@ -29,9 +29,17 @@ import tensorflow as tf
 tf.logging.set_verbosity(tf.logging.ERROR)
 
 from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
-from keras.layers import Conv2D, Dense, Dropout, Flatten, MaxPool2D
+from keras.layers import (
+    Activation,
+    BatchNormalization,
+    Conv2D,
+    Dense,
+    Dropout,
+    Flatten,
+    MaxPool2D,
+)
 from keras.models import Sequential
-from keras.optimizers import Adam
+from keras.optimizers import Adam, SGD, RMSprop
 from keras.preprocessing.image import (
     ImageDataGenerator,
     array_to_img,
@@ -83,36 +91,43 @@ fig.tight_layout()
 # Our first model is a simple stack of 3 convolution layers with a ReLU activation followed by max-pooling layers. On top of it we add two fully-connected layers. We end the model with a single unit and a sigmoid activation for binary classification. To go with it we will also use the `binary_crossentropy` loss to train our model.
 
 # %%
+NB_TRAIN_SAMPLES = 498
+NB_VALIDATION_SAMPLES = 500
+
+IMG_WIDTH, IMG_HEIGHT = 150, 150
+BATCH_SIZE = 32
+
+# %%
 model = Sequential()
-model.add(
-    Conv2D(
-        32,
-        (3, 3),
-        input_shape=(32, 32, 1),
-        activation="relu",
-        kernel_initializer="he_normal",
-    )
-)
+model.add(Conv2D(32, (3, 3), input_shape=(IMG_WIDTH, IMG_HEIGHT, 3), use_bias=False))
+model.add(BatchNormalization())
+model.add(Activation("relu"))
 model.add(MaxPool2D(pool_size=(2, 2)))
-model.add(Dropout(0.25))
 
-model.add(Conv2D(64, (3, 3), activation="relu"))
+model.add(Conv2D(32, (3, 3), use_bias=False))
+model.add(BatchNormalization())
+model.add(Activation("relu"))
 model.add(MaxPool2D(pool_size=(2, 2)))
-model.add(Dropout(0.25))
 
-model.add(Conv2D(128, (3, 3), activation="relu"))
+model.add(Conv2D(64, (3, 3), use_bias=False))
+model.add(BatchNormalization())
+model.add(Activation("relu"))
 model.add(MaxPool2D(pool_size=(2, 2)))
-model.add(Dropout(0.4))
 
 # the model so far outputs 3D feature maps (height, width, features)
 
 model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
-model.add(Dense(128, activation="relu"))
-model.add(Dropout(0.3))
+model.add(Dense(64, use_bias=False))
+model.add(BatchNormalization())
+model.add(Activation("relu"))
+model.add(Dropout(0.5))
 model.add(Dense(1, activation="sigmoid"))
 
-adam = Adam(lr=1e-4)
-model.compile(loss="binary_crossentropy", optimizer=adam, metrics=["accuracy"])
+model.compile(
+    loss="binary_crossentropy",
+    optimizer=RMSprop(lr=1e-3),
+    metrics=["accuracy"],
+)
 
 # %% [markdown]
 # Let's prepare our data. We will use .flow_from_directory() to generate batches of image data and their labels directly from our jpgs in their respective folders.
@@ -120,46 +135,46 @@ model.compile(loss="binary_crossentropy", optimizer=adam, metrics=["accuracy"])
 # As a part of image processing we will apply rescale transformation. Below ImageDataGenerator's `rescale` parameter is a value by which we will multiply the data before any other processing. Our original images consist of RGB coefficients in the 0-255, but such values would be too high for our models to process given a typical learning rate, so we target values between 0 and 1 instead by scaling with a 1/255 factor.
 
 # %%
-batch_size = 32
-
-datagen = ImageDataGenerator(
-    rescale=1.0 / 255,
-    samplewise_center=True,
-    samplewise_std_normalization=True,
-    rotation_range=360,
-    zoom_range=0.2,
-    horizontal_flip=True,
+# augmentation configuration we will use for training
+train_datagen = ImageDataGenerator(
+    rescale=1.0 / 255, rotation_range=360, zoom_range=0.2, horizontal_flip=True
 )
+
+# augmentation configuration we will use for testing - only rescaling
+test_datagen = ImageDataGenerator(rescale=1.0 / 255)
 
 # a generator that will read pictures found in subfolers of 'data/train'
 # and indefinitely generate batches of augmented image data.
-train_generator = datagen.flow_from_directory(
-    "data/train", target_size=(32, 32), batch_size=batch_size, class_mode="binary", color_mode="grayscale"
+train_generator = train_datagen.flow_from_directory(
+    "data/train", target_size=(IMG_WIDTH, IMG_HEIGHT), batch_size=BATCH_SIZE, class_mode="binary"
 )
 
 # a similar generator for validation data
-validation_generator = datagen.flow_from_directory(
-    "data/test", target_size=(32, 32), batch_size=batch_size, class_mode="binary", color_mode="grayscale"
+validation_generator = test_datagen.flow_from_directory(
+    "data/test", target_size=(IMG_WIDTH, IMG_HEIGHT), batch_size=BATCH_SIZE, class_mode="binary"
 )
 
 # %% [markdown]
 # We can now use these generators to train our model. We will use a simple checkpointing strategy to save the best weights of our model. We will also use TensorBoard callback for visualization of training process.
 
 # %%
-es = EarlyStopping(monitor="val_loss", mode="min", patience=5, verbose=1)
+# es = EarlyStopping(monitor="val_loss", mode="min", patience=5, verbose=1)
 
-checkpoint_path = "auxiliary/model.h5"
+checkpoint_path = "auxiliary/custom_conv_model.h5"
 checkpoint = ModelCheckpoint(
     checkpoint_path, monitor="val_acc", verbose=1, save_best_only=True, mode="max"
 )
 
-tensorboard = TensorBoard(log_dir="auxiliary/logs", write_graph=True, write_images=True)
+# tensorboard = TensorBoard(log_dir="auxiliary/logs", write_graph=True, write_images=True)
 
 model.fit_generator(
     train_generator,
-    steps_per_epoch=ceil(541 / batch_size) * 60,
+    steps_per_epoch=ceil(NB_TRAIN_SAMPLES / BATCH_SIZE),
     epochs=100,
     validation_data=validation_generator,
-    validation_steps=ceil(500 / batch_size) * 16,
-    callbacks=[es, checkpoint, tensorboard],
+    validation_steps=ceil(NB_VALIDATION_SAMPLES / BATCH_SIZE),
+    callbacks=[checkpoint],
 )
+
+# %% [markdown]
+# With a custom simple convnet model we were able to reach 69% accuracy on our validation set.
