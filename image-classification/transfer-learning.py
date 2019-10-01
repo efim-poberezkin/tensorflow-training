@@ -69,7 +69,7 @@ def get_data_generator():
 def get_batches(
     path,
     datagen=get_data_generator(),
-    target_size=(IMG_WIDTH, IMG_HEIGHT),
+    target_size=(IMG_HEIGHT, IMG_WIDTH),
     batch_size=BATCH_SIZE,
     class_mode="binary",
     shuffle=True,
