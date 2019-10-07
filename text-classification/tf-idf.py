@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ---
 # jupyter:
 #   jupytext:
@@ -30,7 +31,7 @@ import nltk
 nltk.download("stopwords", quiet=True)
 
 import progressbar
-from nltk.corpus import stopwords
+import stop_words
 from pymystem3 import Mystem
 
 # Math and visualization
@@ -81,7 +82,13 @@ table = str.maketrans({key: " " for key in punctuation})
 
 # Create lemmatizer and stopwords list
 mystem = Mystem()
-russian_stopwords = set(stopwords.words("russian"))
+
+# Compile list of stopwords
+stops = set(
+    nltk.corpus.stopwords.words("russian")
+    + stop_words.get_stop_words("russian")
+    + ["свой"]
+)
 
 
 def preprocess(text):
@@ -95,9 +102,7 @@ def preprocess(text):
     tokens = [
         token
         for token in tokens
-        if token not in russian_stopwords
-        and token != " "
-        and token.strip() not in punctuation
+        if token not in stops and token != " " and token.strip() not in punctuation
     ]
     text = " ".join(tokens)
     return text
@@ -129,22 +134,11 @@ with open("auxiliary/reviews_dataset_preprocessed.pkl", "wb") as f:
     pickle.dump(X, f)
 
 # %% [markdown]
-# ### Train-test split 
-
-# %% [markdown]
-# We won't be using cross validation here, so that when we'll be training neural nets for the same task later on we'll have the same training and evaluation setup, and cross validating NNs training would take too long.
-
-# %%
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=37, stratify=y
-)
-
-# %% [markdown]
 # ### TF-IDF representation
 
 # %%
 tfidf = TfidfVectorizer()
-X_train_tfidf = tfidf.fit_transform(X_train)
+X_tfidf = tfidf.fit_transform(X)
 features = np.array(tfidf.get_feature_names())
 
 
@@ -152,14 +146,14 @@ features = np.array(tfidf.get_feature_names())
 # ## Word importance
 
 # %% [markdown]
-# Let's take the look at the most important words across corpus on training.
+# Let's take the look at the most important words across the whole corpus.
 
 # %%
-def top_mean_feats_for_class(X_tfidf, features, clss, top_n=25):
+def top_mean_feats_for_class(X_tfidf, y, features, clss, top_n=25):
     """Returns the top n features that on average are most important amongst documents
     for a given class."""
-    ids = np.where(np.array(y_train) == clss)
-    feats_df = top_mean_feats(X_train_tfidf, features, ids, top_n=top_n)
+    ids = np.where(np.array(y) == clss)
+    feats_df = top_mean_feats(X_tfidf, features, ids, top_n=top_n)
     return feats_df
 
 
@@ -225,9 +219,7 @@ def generate_wordcloud(feats_df, mask=None, colormap=None, contour_color=None):
 # ### Negative reviews
 
 # %%
-neg_feats_df = top_mean_feats_for_class(
-    X_train_tfidf, features, clss=1, top_n=N_WORDCLOUD
-)
+neg_feats_df = top_mean_feats_for_class(X_tfidf, y, features, clss=1, top_n=N_WORDCLOUD)
 
 # %%
 cmap = sns.blend_palette(vapeplot.palette("crystal_pepsi"))
@@ -242,9 +234,7 @@ generate_wordcloud(neg_feats_df, mask=sad_mask, colormap=cmap, contour_color="#9
 # ### Positive reviews
 
 # %%
-pos_feats_df = top_mean_feats_for_class(
-    X_train_tfidf, features, clss=5, top_n=N_WORDCLOUD
-)
+pos_feats_df = top_mean_feats_for_class(X_tfidf, y, features, clss=5, top_n=N_WORDCLOUD)
 
 # %%
 cmap = sns.blend_palette(vapeplot.palette("crystal_pepsi"))
@@ -260,8 +250,18 @@ generate_wordcloud(pos_feats_df, mask=happy_mask, colormap=cmap, contour_color="
 
 # %% [markdown]
 # Now let's train our model on TF-IDF representation and check its performance on the test set.
+#
+# We won't be using cross validation here, so that when we'll be training neural nets for the same task later on we'll have the same training and evaluation setup, and cross validating NNs training would take too long.
 
 # %%
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=37, stratify=y
+)
+
+# %%
+tfidf = TfidfVectorizer()
+X_train_tfidf = tfidf.fit_transform(X_train)
+
 model = LogisticRegression(solver="lbfgs", multi_class="multinomial")
 model.fit(X_train_tfidf, y_train)
 
