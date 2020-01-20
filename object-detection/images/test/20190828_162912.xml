@@ -1,0 +1,26 @@
+<annotation>
+	<folder>test</folder>
+	<filename>20190828_162912.jpg</filename>
+	<path>C:\notebooks\tensorflow1\models\research\object_detection\images\test\20190828_162912.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>504</width>
+		<height>284</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>coin</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>291</xmin>
+			<ymin>136</ymin>
+			<xmax>396</xmax>
+			<ymax>227</ymax>
+		</bndbox>
+	</object>
+</annotation>

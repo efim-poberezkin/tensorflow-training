@@ -1,0 +1,26 @@
+<annotation>
+	<folder>train</folder>
+	<filename>20190828_143656.jpg</filename>
+	<path>C:\notebooks\tensorflow1\models\research\object_detection\images\train\20190828_143656.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>284</width>
+		<height>504</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>coin</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>1</difficult>
+		<bndbox>
+			<xmin>73</xmin>
+			<ymin>194</ymin>
+			<xmax>156</xmax>
+			<ymax>270</ymax>
+		</bndbox>
+	</object>
+</annotation>
